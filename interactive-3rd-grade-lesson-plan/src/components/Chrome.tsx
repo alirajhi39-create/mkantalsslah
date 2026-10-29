@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { lesson, navItems, references, type SectionId } from "../content";
-import { formatScore, stationScore, TOTAL_MAX, type Student } from "../classroom";
+import { formatScore, sectionLabel, stationScore, TOTAL_MAX, type Student } from "../classroom";
 import { Arabesque, Button, Confetti, Icon, ProgressRing, StarBurst, cn, type IconName } from "./ui";
 
 const navIcons: Record<SectionId, IconName> = {
@@ -101,7 +101,7 @@ export function Header({
                   <span className="truncate text-[9px] font-bold text-muted">{studentName}</span>
                   {studentSection && (
                     <span className="shrink-0 rounded-full bg-brand-50 px-1 text-[8px] font-bold text-brand-600">
-                      {studentSection}
+                      {sectionLabel(studentSection)}
                     </span>
                   )}
                 </span>
@@ -284,7 +284,7 @@ export function CertificateModal({
               <p className="mt-1 font-serif text-3xl font-bold text-brand-800 sm:text-4xl">مكانةُ الصلاة</p>
               <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-[10px] font-bold text-brand-700">
                 <Icon name="users" className="h-3 w-3" />
-                {lesson.grade} {studentSection ? `· الصف ${studentSection}` : ""}
+                {lesson.grade} {studentSection ? `· ${sectionLabel(studentSection)}` : ""}
               </p>
 
               <div className="mx-auto mt-4 max-w-sm rounded-2xl border border-gold-400/40 bg-white/70 px-5 py-3">

@@ -6,6 +6,8 @@ import {
   completionPercent,
   completedCount,
   formatLastActive,
+  sectionLabel,
+  SECTION_INFO,
   type SharedSubmission,
   type Student,
   type StudentSection,
@@ -17,7 +19,7 @@ const ar = (value: number) => value.toLocaleString("ar-EG");
 const isPlaceholderName = (name: string) =>
   name === "طالب الصف الثالث" || name === "طالب مجتهد" || name === "طالب اجتهاد" || !name.trim();
 
-const classShort = (section: StudentSection) => (section ? section : "غير محدّد");
+const classShort = (section: StudentSection) => sectionLabel(section);
 
 export function StudentGate({
   students,
@@ -263,7 +265,7 @@ export function StudentGate({
                           <span>
                             <span className="block text-[9px] font-medium text-muted">الصف الثالث</span>
                             <span className="block font-display text-sm font-extrabold text-brand-900">
-                              {option.replace("٣/", "شعبة ")}
+                              {SECTION_INFO[option].name}
                             </span>
                           </span>
                           {selected && <Icon name="check" className="ms-auto h-4 w-4 text-brand-600" />}
@@ -398,7 +400,14 @@ export function SubmissionImport({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-extrabold text-brand-900">{shared.name}</p>
                 <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-muted">
-                  <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-brand-700">الصف {shared.section}</span>
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 py-0.5",
+                      shared.section === "٣/٢" ? "bg-sand-200 text-gold-600" : "bg-brand-50 text-brand-700",
+                    )}
+                  >
+                    {sectionLabel(shared.section)}
+                  </span>
                   <span>·</span>
                   <span>{formatLastActive(shared.submittedAt)}</span>
                 </p>

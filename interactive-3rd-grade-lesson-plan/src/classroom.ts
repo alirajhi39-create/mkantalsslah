@@ -25,6 +25,43 @@ export type StationResult = {
 export const STUDENT_SECTIONS = ["٣/١", "٣/٢"] as const;
 export type StudentSection = (typeof STUDENT_SECTIONS)[number] | "";
 
+/** الشعبتان: أ = ٣/١ و ب = ٣/٢ */
+export const SECTION_INFO: Record<
+  Exclude<StudentSection, "">,
+  { letter: "أ" | "ب"; name: string; code: string }
+> = {
+  "٣/١": { letter: "أ", name: "شعبة أ", code: "٣/١" },
+  "٣/٢": { letter: "ب", name: "شعبة ب", code: "٣/٢" },
+};
+
+export const sectionLabel = (section?: StudentSection | string) =>
+  section === "٣/١" || section === "٣/٢" ? SECTION_INFO[section].name : "بدون شعبة";
+
+export const sectionCode = (section?: StudentSection | string) =>
+  section === "٣/١" || section === "٣/٢" ? SECTION_INFO[section].code : "—";
+
+/** ألوان موحّدة للشعبتين في العرض والطباعة. */
+export const sectionTone = (section?: StudentSection | string) =>
+  section === "٣/٢"
+    ? {
+        badge: "bg-gold-400/20 text-gold-600 ring-1 ring-gold-400/40",
+        solid: "bg-gold-500 text-white",
+        border: "border-gold-400",
+        soft: "bg-sand-100/70",
+        hex: "#9a7025",
+        hexSoft: "#f8f1df",
+        hexBg: "#fdfaf2",
+      }
+    : {
+        badge: "bg-brand-50 text-brand-700 ring-1 ring-brand-200",
+        solid: "bg-brand-700 text-white",
+        border: "border-brand-300",
+        soft: "bg-brand-50/60",
+        hex: "#0f746b",
+        hexSoft: "#edf9f6",
+        hexBg: "#f4fbf9",
+      };
+
 export type Student = {
   id: string;
   name: string;
@@ -469,7 +506,8 @@ const csvCell = (value: string | number) => `"${String(value).replace(/"/g, '""'
 export function buildClassroomCsv(classroom: Classroom): string {
   const headers = [
     "الطالب",
-    "الصف",
+    "الشعبة",
+    "رمز الشعبة",
     "نسبة الإنجاز",
     "أقرأ وأجيب",
     "نشاط الحديث",
@@ -489,7 +527,8 @@ export function buildClassroomCsv(classroom: Classroom): string {
     .filter((student) => student.name !== "طالب الصف الثالث")
     .map((student) => [
     student.name,
-    student.section || "—",
+    sectionLabel(student.section),
+    sectionCode(student.section),
     `${completionPercent(student)}%`,
     ...TASK_KEYS.map((key) => (student.completed[key] ? "مكتمل" : "غير مكتمل")),
     `${stationScore(student)} / 2`,

@@ -19,6 +19,9 @@ import {
   nowISO,
   removeDemoStudents,
   removeStudentCompletely,
+  sectionLabel,
+  sectionTone,
+  SECTION_INFO,
   stationScore,
   totalCorrect,
   totalIncorrect,
@@ -43,6 +46,7 @@ import {
 import type { StudentSubmission } from "../classroom";
 
 type Filter = "all" | "complete" | "progress" | "notstarted" | "support";
+type SectionFilter = "all" | "٣/١" | "٣/٢";
 
 const UNLOCK_SESSION_KEY = TEACHER_UNLOCK_KEY;
 
@@ -435,6 +439,8 @@ function TeacherDashboard({
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [sectionFilter, setSectionFilter] = useState<SectionFilter>("all");
+  const [printScope, setPrintScope] = useState<SectionFilter>("all");
   const [newName, setNewName] = useState("");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -539,6 +545,7 @@ function TeacherDashboard({
   const filtered = useMemo(() => {
     const term = query.trim();
     return students.filter((student) => {
+      if (sectionFilter !== "all" && student.section !== sectionFilter) return false;
       if (term && !student.name.includes(term)) return false;
       const percent = completionPercent(student);
       if (filter === "complete") return percent === 100;
@@ -547,7 +554,7 @@ function TeacherDashboard({
       if (filter === "support") return needsSupport(student);
       return true;
     });
-  }, [students, query, filter]);
+  }, [students, query, filter, sectionFilter]);
 
   const setActive = (student: Student, close = false) => {
     onChange({ ...classroom, activeId: student.id });
@@ -802,17 +809,15 @@ function TeacherDashboard({
       return;
     }
 
-    const bySection = (section: "٣/١" | "٣/٢") => students.filter((student) => student.section === section);
+    const scopedStudents =
+      printScope === "all" ? students : students.filter((student) => student.section === printScope);
+    const bySection = (section: "٣/١" | "٣/٢") => scopedStudents.filter((student) => student.section === section);
     const avgScore = (list: typeof students) =>
       list.length ? Math.round((list.reduce((sum, student) => sum + totalScore(student), 0) / list.length) * 10) / 10 : 0;
 
     const toneOf = (value: number) => (value >= 4 ? "good" : value >= 2.5 ? "mid" : value > 0 ? "low" : "zero");
 
-    const rows =
-      students.length === 0
-        ? `<tr><td colspan="6" class="empty">لا توجد بيانات طلاب في هذا السجل حتى الآن.</td></tr>`
-        : students
-            .map((student, index) => {
+    const renderRow = (student: (typeof students)[number], index: number) => {
               const percent = completionPercent(student);
               const score = totalScore(student);
               const tone = toneOf(score);
@@ -825,12 +830,13 @@ function TeacherDashboard({
               const notes = student.notes
                 ? `<div class="note">📝 ${escapeHtml(student.notes.slice(0, 70))}${student.notes.length > 70 ? "…" : ""}</div>`
                 : "";
-              return `<tr>
-                <td class="idx">${index + 1}</td>
+              return `<tr class="row-${student.section === "٣/٢" ? "b" : "a"}">
+                <td class="idx"><span class="idx-badge">${index + 1}</span></td>
                 <td class="who">
                   <div class="name">${escapeHtml(student.name)}</div>
                   <div class="sub">
-                    <span class="sec">${escapeHtml(student.section || "—")}</span>
+                    <span class="sec ${student.section === "٣/٢" ? "sec-b" : "sec-a"}">${escapeHtml(sectionLabel(student.section))}</span>
+                    <span class="sec-code">${escapeHtml(student.section || "—")}</span>
                     ${student.demo ? `<span class="demo">تجريبي</span>` : ""}
                     <span class="active">آخر نشاط: ${escapeHtml(formatLastActive(student.lastActive))}</span>
                   </div>
@@ -853,15 +859,42 @@ function TeacherDashboard({
                   }
                 </td>
               </tr>`;
-            })
-            .join("");
+    };
 
-    const sectionCards = (["٣/١", "٣/٢"] as const)
+    const sectionsToShow = (["٣/١", "٣/٢"] as const).filter(
+      (section) => printScope === "all" || printScope === section,
+    );
+
+    const rows = sectionsToShow
       .map((section) => {
         const list = bySection(section);
-        return `<div class="section-card">
-          <div class="s-label">شعبة ${section}</div>
+        const info = SECTION_INFO[section];
+        if (list.length === 0) return "";
+        const avg = avgScore(list);
+        const finished = list.filter((student) => completionPercent(student) === 100).length;
+        const band = `<tr class="band band-${section === "٣/٢" ? "b" : "a"}">
+          <td colspan="6">
+            <div class="band-inner">
+              <span class="band-letter">${info.letter}</span>
+              <div class="band-text">
+                <b>${info.name}</b>
+                <small>الرمز ${info.code} · ${ar(list.length)} طالب · متوسط الدرجة <span dir="ltr">${formatScore(avg)}/${formatScore(TOTAL_MAX)}</span> · أتموا الرحلة ${ar(finished)}</small>
+              </div>
+            </div>
+          </td>
+        </tr>`;
+        return band + list.map((student, index) => renderRow(student, index)).join("");
+      })
+      .join("");
+
+    const sectionCards = sectionsToShow
+      .map((section) => {
+        const list = bySection(section);
+        const info = SECTION_INFO[section];
+        return `<div class="section-card card-${section === "٣/٢" ? "b" : "a"}">
+          <div class="s-label s-label-${section === "٣/٢" ? "b" : "a"}">${info.name}</div>
           <div class="s-value">${ar(list.length)} <small>طالب</small></div>
+          <div class="s-code">${info.code}</div>
           <div class="s-note">متوسط الدرجة <span dir="ltr" class="ratio">${formatScore(avgScore(list))}/${formatScore(TOTAL_MAX)}</span></div>
         </div>`;
       })
@@ -938,7 +971,10 @@ function TeacherDashboard({
     flex: 1; display: flex; align-items: center; gap: 8px;
     border: 1px dashed #a9e2d7; background: #f4fbf9; border-radius: 10px; padding: 6px 9px;
   }
+  .section-card.card-b { border-color: #e6d3a6; background: #fdfaf2; }
   .s-label { font-size: 9px; font-weight: 800; color: #0f746b; background: #fff; border-radius: 6px; padding: 2px 7px; }
+  .s-label-b { color: #9a7025; }
+  .s-code { font-size: 7px; font-weight: 800; color: #9db3ad; background: #fff; border-radius: 5px; padding: 1px 4px; }
   .s-value { font-size: 12px; font-weight: 800; color: #0e3e3b; }
   .s-value small { font-size: 7.5px; font-weight: 700; color: #5c736e; }
   .s-note { margin-inline-start: auto; font-size: 8px; color: #5c736e; font-weight: 700; }
@@ -1000,6 +1036,25 @@ function TeacherDashboard({
   .not-sent { color: #b8623d; font-weight: 700; }
   .when { color: #9db3ad; font-size: 7px; margin-top: 1px; }
   .empty { text-align: center; padding: 24px; color: #5c736e; font-weight: 700; }
+  .band td { padding: 0; border: none; }
+  .band-inner {
+    display: flex; align-items: center; gap: 8px; margin: 6px 0 4px; padding: 5px 9px;
+    border-radius: 9px;
+  }
+  .band-a .band-inner { background: #edf9f6; border: 1px solid #a9e2d7; border-right: 4px solid #0f746b; }
+  .band-b .band-inner { background: #f8f1df; border: 1px solid #e6d3a6; border-right: 4px solid #bc8d31; }
+  .band-letter {
+    width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center;
+    font-size: 11px; font-weight: 800; background: #0f746b; color: #fff;
+  }
+  .band-b .band-letter { background: #bc8d31; color: #fff; }
+  .band-text b { font-size: 10px; color: #0e3e3b; }
+  .band-text small { display: block; font-size: 7.5px; color: #5c736e; font-weight: 700; }
+  .sec-code { font-size: 6.5px; color: #9db3ad; font-weight: 700; }
+  .sec-b { background: #f0e4c8 !important; color: #9a7025 !important; }
+  .row-b td { background: #fffdf6; }
+  .idx-badge { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: #edf9f6; color: #0f746b; font-size: 7px; font-weight: 800; }
+  .row-b .idx-badge { background: #f8f1df; color: #9a7025; }
 
   /* ---------------- Footer ---------------- */
   .legend {
@@ -1017,7 +1072,13 @@ function TeacherDashboard({
     margin-top: 10px; border-top: 2px solid #0e5d57; padding-top: 5px; font-size: 7.5px; color: #9db3ad;
   }
   .foot .brandline { display: inline-flex; align-items: center; gap: 4px; color: #0f746b; font-weight: 800; }
-  @media print { body { font-size: 10px; } thead { display: table-header-group; } tr { page-break-inside: avoid; } }
+  @media print {
+    body { font-size: 10px; }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; }
+    .hero, .stats, .sections, .legend, .sign, .foot { page-break-inside: avoid; }
+    .band { break-inside: avoid; }
+  }
 </style></head>
 <body>
   <div class="sheet">
@@ -1043,7 +1104,7 @@ function TeacherDashboard({
     </header>
 
     <section class="stats">
-      <div class="stat teal"><div class="k">طلاب السجل</div><div class="v">${ar(stats.total)} <small>طالب</small></div></div>
+      <div class="stat teal"><div class="k">${printScope === "all" ? "طلاب السجل" : sectionLabel(printScope)}</div><div class="v">${ar(scopedStudents.length)} <small>طالب</small></div></div>
       <div class="stat"><div class="k">متوسط الإنجاز</div><div class="v" dir="ltr">${ar(stats.average)}%</div></div>
       <div class="stat gold"><div class="k">متوسط الدرجة</div><div class="v" dir="ltr">${formatScore(stats.averageScore)} <small>/ ${formatScore(TOTAL_MAX)}</small></div></div>
       <div class="stat green"><div class="k">أتموا الرحلة</div><div class="v">${ar(stats.finished)}</div></div>
@@ -1063,7 +1124,7 @@ function TeacherDashboard({
           <th>التسليم</th>
         </tr>
       </thead>
-      <tbody>${rows}</tbody>
+      <tbody>${rows || `<tr><td colspan="6" class="empty">لا توجد بيانات طلاب في هذا النطاق حتى الآن.</td></tr>`}</tbody>
     </table>
 
     <div class="legend">
@@ -1148,6 +1209,17 @@ function TeacherDashboard({
             >
               <span className="hidden md:inline">تصدير CSV</span>
             </Button>
+            <select
+              value={printScope}
+              onChange={(event) => setPrintScope(event.target.value as SectionFilter)}
+              aria-label="نطاق الطباعة حسب الشعبة"
+              title="اختر الشعبة المطلوب طباعتها"
+              className="hidden h-9 rounded-xl border border-brand-200 bg-white px-2 text-[10px] font-extrabold text-brand-800 outline-none transition hover:border-brand-400 focus:border-brand-500 md:block"
+            >
+              <option value="all">طباعة: كل الشعب</option>
+              <option value="٣/١">طباعة: شعبة أ</option>
+              <option value="٣/٢">طباعة: شعبة ب</option>
+            </select>
             <Button
               variant="secondary"
               size="sm"
@@ -1353,7 +1425,7 @@ function TeacherDashboard({
                   </span>
                   {active.section && (
                     <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                      الصف {active.section}
+                      {sectionLabel(active.section)}
                     </span>
                   )}
                   {active.submittedAt && (
@@ -1460,8 +1532,8 @@ function TeacherDashboard({
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-1.5">
                           <span className="truncate text-[11px] font-extrabold text-brand-900">{submission.name}</span>
-                          <span className="rounded-full bg-gold-400/20 px-1.5 py-0.5 text-[8px] font-extrabold text-gold-600">
-                            {submission.section}
+                          <span className={cn("rounded-full px-1.5 py-0.5 text-[8px] font-extrabold", sectionTone(submission.section).badge)}>
+                            {sectionLabel(submission.section)}
                           </span>
                         </span>
                         <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[9px] font-medium text-muted">
@@ -1636,6 +1708,29 @@ function TeacherDashboard({
                 ))}
               </div>
 
+              <div className="flex w-full items-center gap-1 rounded-xl border border-brand-100 bg-white p-1 sm:w-auto">
+                <span className="px-1 text-[9px] font-bold text-muted">الشعبة</span>
+                {([
+                  { id: "all" as SectionFilter, label: "الكل", tone: "bg-brand-900 text-white" },
+                  { id: "٣/١" as SectionFilter, label: "أ", tone: "bg-brand-700 text-white" },
+                  { id: "٣/٢" as SectionFilter, label: "ب", tone: "bg-gold-500 text-white" },
+                ]).map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setSectionFilter(option.id)}
+                    aria-pressed={sectionFilter === option.id}
+                    className={cn(
+                      "rounded-lg px-2.5 py-1 text-[10px] font-extrabold transition",
+                      sectionFilter === option.id ? option.tone : "text-brand-600 hover:bg-brand-50",
+                    )}
+                    title={option.id === "all" ? "كل الشعب" : sectionLabel(option.id)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="relative min-w-0 flex-1 lg:w-56 lg:flex-none">
                 <Icon name="search" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-300" />
                 <input
@@ -1752,8 +1847,8 @@ function TeacherDashboard({
                                     </span>
                                   )}
                                   {student.section && (
-                                    <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[8px] font-bold text-brand-700">
-                                      {student.section}
+                                    <span className={cn("rounded-full px-1.5 py-0.5 text-[8px] font-bold", sectionTone(student.section).badge)}>
+                                      {sectionLabel(student.section)}
                                     </span>
                                   )}
                                   {(student as CloudStudent).cloud && (
@@ -1928,8 +2023,8 @@ function TeacherDashboard({
                               <span className="rounded-full bg-sand-200 px-1.5 py-0.5 text-[8px] font-bold text-gold-600">تجريبي</span>
                             )}
                             {student.section && (
-                              <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[8px] font-bold text-brand-700">
-                                {student.section}
+                              <span className={cn("rounded-full px-1.5 py-0.5 text-[8px] font-bold", sectionTone(student.section).badge)}>
+                                {sectionLabel(student.section)}
                               </span>
                             )}
                             {student.submittedAt && (
@@ -2085,7 +2180,9 @@ function TeacherDashboard({
                     <p className="mt-0.5 flex flex-wrap items-center gap-1 text-[9px] font-medium text-brand-100/75">
                       <span>{detail.id === active?.id ? "الطالب الحالي في الدرس" : "طالب في الصف"}</span>
                       {detail.section && (
-                        <span className="rounded-full bg-white/15 px-1.5 py-0.5 font-bold text-white">الصف {detail.section}</span>
+                        <span className={cn("rounded-full px-1.5 py-0.5 font-bold", detail.section === "٣/٢" ? "bg-gold-400 text-brand-900" : "bg-white text-brand-800")}>
+                          {sectionLabel(detail.section)}
+                        </span>
                       )}
                       {detail.submittedAt && (
                         <span className="inline-flex items-center gap-0.5 rounded-full bg-gold-400/20 px-1.5 py-0.5 font-bold text-gold-400">
@@ -2332,7 +2429,9 @@ function TeacherDashboard({
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <dt className="text-muted">الصف الدراسي</dt>
-                    <dd className="font-bold text-brand-800">{detail.section || "لم يُحدّد"}</dd>
+                    <dd className="font-bold text-brand-800">
+                      {detail.section ? `${sectionLabel(detail.section)} (${detail.section})` : "لم تُحدّد"}
+                    </dd>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <dt className="text-muted">تسليم البطاقة للمعلم</dt>

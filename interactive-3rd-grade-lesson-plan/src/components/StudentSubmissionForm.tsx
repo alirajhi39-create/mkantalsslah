@@ -7,6 +7,8 @@ import {
   encodeSubmission,
   formatLastActive,
   formatScore,
+  sectionLabel,
+  SECTION_INFO,
   stationScore,
   totalScore,
   STATIONS_MAX,
@@ -86,7 +88,7 @@ export function StudentSubmissionForm({
     const summary = [
       "تسليم درس مكانة الصلاة",
       `الطالب: ${student.name}`,
-      `الصف: ${student.section || "—"}`,
+      `الشعبة: ${sectionLabel(student.section)}`,
       `الإنجاز: ${ar(progress)}٪ (${ar(completedCount(student))} من ٤ محطات)`,
       `درجة التقويم: ${ar(student.evaluationScore)} من ٣`,
       `وقت التسليم: ${formatLastActive(student.submittedAt ?? new Date().toISOString())}`,
@@ -246,7 +248,7 @@ export function StudentSubmissionForm({
                     <dl className="mt-4 space-y-2 rounded-2xl border border-brand-100 bg-sand-50 p-3.5">
                       {[
                         { label: "اسم الطالب", value: student.name },
-                        { label: "الصف", value: student.section || "—" },
+                        { label: "الشعبة", value: sectionLabel(student.section) },
                         { label: "المحطات المكتملة", value: `${ar(completedCount(student))} من ٤` },
                         { label: "درجة التقويم", value: `${ar(student.evaluationScore)} من ٣` },
                         {
@@ -417,7 +419,7 @@ export function StudentSubmissionForm({
                               <span className="min-w-0">
                                 <span className="block text-[9px] font-medium text-muted">الصف الثالث</span>
                                 <span className="block font-display text-sm font-extrabold text-brand-900">
-                                  {option.replace("٣/", "شعبة ")}
+                                  {SECTION_INFO[option].name}
                                 </span>
                               </span>
                               <span
